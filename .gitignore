@@ -1,0 +1,6 @@
+__pycache__/
+
+# Files created by setup.py
+/build/
+/dist/
+MANIFEST
