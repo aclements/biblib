@@ -429,7 +429,7 @@ class Entry(collections.OrderedDict):
     def authors(self, field='author'):
         """Return a list of parsed author names."""
         from .algo import parse_names
-        return parse_names(self[field])
+        return parse_names(self[field], self.field_pos[field])
 
     def month_num(self, field='month'):
         """Convert the month of this entry into a number in [1,12].

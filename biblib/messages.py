@@ -26,6 +26,8 @@ class Pos(collections.namedtuple('Pos', 'fname line col log_fp')):
             self.log_fp.write('{}: error: {}\n'.format(self, msg))
         raise InputError([(self, msg)])
 
+Pos.unknown = Pos('<unknown>', 1, 0, None)
+
 class PosFactory:
     """A factory that translates character offsets to Pos instances."""
 

@@ -13,6 +13,8 @@ import re
 import collections
 import unicodedata
 
+from . import messages
+
 # Control sequences (defined as "control_seq_ilk" in bibtex) and their
 # Unicode translations.  This is similar to, but slightly different
 # from the TeX definitions (of course).
@@ -86,10 +88,10 @@ class NameParser:
                 return (toks[:von_end-1], toks[von_end:])
         return ([], toks)
 
-    def parse(self, string):
+    def parse(self, string, pos):
         """Parse a BibTeX name list.
 
-        Returns a list of Name objects.  Raises ValueError if there is
+        Returns a list of Name objects.  Raises InputError if there is
         a syntax error.
         """
 
@@ -103,9 +105,13 @@ class NameParser:
         names = []
         for name_string in name_strings:
             # Remove leading and trailing white space, ~, and -, and
-            # trailing commas.  XXX BibTeX warns about trailing
-            # commas.
-            name_string = name_string.strip('-~ \t').rstrip(',')
+            # trailing commas.
+            name_string = name_trailing = name_string.lstrip('-~ \t')
+            name_string = name_string.rstrip('-~ \t,')
+            if ',' in name_trailing[len(name_string):]:
+                # BibTeX warns about this because it often indicates a
+                # bigger syntax problem
+                pos.warn('trailing comma after name `{}\''.format(name_string))
 
             # Split on depth-0 commas and further split tokens in each
             # part, keeping only the first connector between each
@@ -141,14 +147,8 @@ class NameParser:
                 if len(parts) == 3:
                     jr = parts[2]
             else:
-                # XXX It would be nice if we could position this
-                # message and possibly integrate it with the error
-                # stream from the BibTeX parser.  Maybe have a context
-                # manager that catches and reports logged errors and
-                # can then be queried for whether errors occurred?  If
-                # the caller isn't in the context, the exception will
-                # propagate as usual.
-                raise ValueError('too many commas in name `{}\''.format(name))
+                pos.raise_error(
+                    'too many commas in name `{}\''.format(name_string))
 
             names.append(Name(''.join(first), ''.join(von),
                               ''.join(last), ''.join(jr)))
@@ -167,14 +167,14 @@ class Name(collections.namedtuple('Name', 'first von last jr')):
         return self.first == '' and self.von == '' and \
             self.last == 'others' and self.jr == ''
 
-def parse_names(string):
+def parse_names(string, pos=messages.Pos.unknown):
     """Parse a BibTeX name list (e.g., an author or editor field).
 
     Returns a list of Name objects.  The parsing is equivalent to
-    BibTeX's built-in "format.name$" function.  Raises ValueError if
+    BibTeX's built-in "format.name$" function.  Raises InputError if
     there is a syntax error.
     """
-    return NameParser().parse(string)
+    return NameParser().parse(string, pos)
 
 CS_RE = re.compile(r'\\[a-zA-Z]+')
 
