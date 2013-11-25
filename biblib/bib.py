@@ -253,6 +253,7 @@ class Parser:
 
         # Scan entries (starting with comma or close after key)
         fields = []
+        field_pos = {}
         while True:
             if self._try_tok(right_re):
                 break
@@ -261,15 +262,17 @@ class Parser:
                 break
 
             # Scan field name and value
+            field_off = self.__pos
             field = self._scan_identifier().lower()
             self._tok('=', 'expected = after field name')
             value = self._scan_field_value()
 
             fields.append((field, value))
+            field_pos[field] = self.__pos_factory.offset_to_pos(field_off)
 
         if key.lower() in self.__entries:
             self._fail('repeated entry')
-        self.__entries[key.lower()] = Entry(fields, typ, key, pos)
+        self.__entries[key.lower()] = Entry(fields, typ, key, pos, field_pos)
 
     def _scan_field_value(self):
         # See scan_and_store_the_field_value_and_eat_white
@@ -317,12 +320,13 @@ MONTHS = 'January February March April May June July August September October No
 class Entry(collections.OrderedDict):
     """An entry in a BibTeX database.
 
-    This is an ordered dictionary of fields, plus three additional
+    This is an ordered dictionary of fields, plus some additional
     properties: typ gives the type of the entry, such as "journal",
-    canonicalized to lower case; key gives the database entry key
-    (case is preserved, but should be ignored for comparisons); and
-    pos is a messages.Pos instance giving the position of this entry
-    in the database file.
+    canonicalized to lower case.  key gives the database entry key
+    (case is preserved, but should be ignored for comparisons).  pos
+    is a messages.Pos instance giving the position of this entry in
+    the database file.  field_pos is a simple dictionary from field
+    names to message.Pos instances.
 
     Field values are as they would be seen by a .bst file: white space
     is cleaned up, but they retain macros, BibTeX-style accents, etc.
@@ -330,12 +334,12 @@ class Entry(collections.OrderedDict):
     Unicode strings.
     """
 
-    def __init__(self, fields, typ=None, key=None, pos=None):
+    def __init__(self, fields, typ=None, key=None, pos=None, field_pos=None):
         super().__init__(fields)
-        self.typ, self.key, self.pos = typ, key, pos
+        self.typ, self.key, self.pos, self.field_pos = typ, key, pos, field_pos
 
     def copy(self):
-        return self.__class__(self, self.typ, self.key, self.pos)
+        return self.__class__(self, self.typ, self.key, self.pos, self.field_pos)
 
     def __str__(self):
         return '`{}\' at {}'.format(self.key, self.pos)
@@ -393,8 +397,11 @@ class Entry(collections.OrderedDict):
         if 'crossref' not in self:
             return self
         nentry = self.copy()
-        for k, v in entries[self['crossref'].lower()].items():
-            nentry.setdefault(k, v)
+        source = entries[self['crossref'].lower()]
+        for k, v in source.items():
+            if k not in nentry:
+                nentry[k] = v
+                nentry.field_pos[k] = source.field_pos[k]
         del nentry['crossref']
         return nentry
 
@@ -410,13 +417,12 @@ class Entry(collections.OrderedDict):
         year, month = self.get('year'), self.get('month')
         if year is not None:
             if not year.isdigit():
-                # XXX Use field position
-                self.pos.raise_error('invalid year `{}\''.format(year))
+                self.field_pos['year'].raise_error(
+                    'invalid year `{}\''.format(year))
             key += (int(year),)
         if month is not None:
             if year is None:
-                # XXX Use field position
-                self.pos.raise_error('month without year')
+                self.field_pos['month'].raise_error('month without year')
             key += (self.month_num(),)
         return key
 
@@ -438,5 +444,5 @@ class Entry(collections.OrderedDict):
         for i, name in enumerate(MONTHS):
             if name.startswith(val) and len(val) >= 3:
                 return i + 1
-        # XXX Use field position
-        self.pos.raise_error('invalid month `{}\''.format(self[field]))
+        self.field_pos[field].raise_error(
+            'invalid month `{}\''.format(self[field]))
