@@ -13,6 +13,8 @@ import re
 import collections
 import textwrap
 
+from . import messages
+
 # Match sequences of legal identifier characters, except that the
 # first is not allowed to be a digit (see id_class)
 ID_RE = re.compile('(?![0-9])(?:(?![ \t"#%\'(),={}])[\x20-\x7f])+')
@@ -65,12 +67,22 @@ class Parser:
         """Declare a macro, just like an @string command."""
         self.__macros[name] = value
 
-    def parse(self, str_or_fp, name=None):
+    def parse(self, str_or_fp, name=None, *, log_fp=None):
         """Parse the contents of str_or_fp and return self.
 
         str_or_fp must be a string or a file-like object.  If name is
         not None, it is used as the file name.  Otherwise, the name is
         '<string>' for str objects or str_or_fp.name otherwise.
+
+        If log_fp is not None, it must be a file-local object to which
+        warnings and InputErrors will be logged.  This logger will be
+        attached to all Pos instances created from the file being
+        parsed, so any warnings or InputErrors raised from later
+        operations on derived objects (like entries or field values)
+        will also be logged to log_fp.
+
+        If there are any errors in the input, raises a (potentially
+        bundled) InputError.
 
         Parse can be called multiple times to parse subsequent .bib
         files.  Later files will have access to, for example, strings
@@ -79,70 +91,58 @@ class Parser:
 
         if isinstance(str_or_fp, str):
             self.__data = str_or_fp
-            self.__fname = name or '<string>'
+            fname = name or '<string>'
         else:
             self.__data = str_or_fp.read()
-            self.__fname = name or str_or_fp.name
+            fname = name or str_or_fp.name
         self.__pos = 0
 
         # Remove trailing whitespace from lines in data (see input_ln
         # in bibtex.web)
         self.__data = re.sub('[ \t]+$', '', self.__data, flags=re.MULTILINE)
+        self.__pos_factory = messages.PosFactory(fname, self.__data, log_fp)
 
         # Parse entries
+        recoverer = messages.InputErrorRecoverer()
         while self.__pos < len(self.__data):
-            try:
+            # Just continue to the next entry if there's an error
+            with recoverer:
                 self._scan_command_or_entry()
-            except ParseError:
-                # Continue to the next entry
-                pass
+        recoverer.reraise()
         return self
 
-    def finalize(self, log_fp=None):
+    def finalize(self):
         """Perform final checks and return the database.
 
-        This checks cross-ref validity, writes errors and warnings to
-        log_fp (or sys.stderr), and returns the database or None if
-        there were errors.  The database is an ordered dictionary
-        mapping from lower-cased keys to Entry objects.
+        This checks cross-ref validity and returns the database.  The
+        database is an ordered dictionary mapping from lower-cased
+        keys to Entry objects.
+
+        If there are errors during finalization, raises a (potentially
+        bundled) InputError.
         """
 
         # Check cross-refs (XXX crossrefs must come later)
+        recoverer = messages.InputErrorRecoverer()
         for ent in self.__entries.values():
             crossref = ent.get('crossref')
             if crossref is not None and crossref.lower() not in self.__entries:
-                try:
-                    self._fail('unknown crossref `{}\''.format(crossref),
-                               ent.pos)
-                except ParseError:
-                    pass
-
-        # Report log
-        if log_fp is None:
-            log_fp = sys.stderr
-        for msg in self.__log:
-            print(msg, file=log_fp)
-        if self.__errors:
-            return None
+                with recoverer:
+                    ent.pos.raise_error(
+                        'unknown crossref `{}\''.format(crossref))
+        recoverer.reraise()
 
         return self.__entries
 
     def _fail(self, msg, pos=None):
-        self.__log.append('{}: error: {}'.format(self._str_pos(pos), msg))
-        self.__errors = True
-        raise ParseError()
-
-    def _warn(self, msg, pos=None):
-        self.__log.append('{}: warning: {}'.format(self._str_pos(pos), msg))
-
-    def _str_pos(self, pos=None):
-        if isinstance(pos, str):
-            return pos
         if pos is None:
             pos = self.__pos
-        lineno = self.__data.count('\n', 0, pos) + 1
-        lbegin = self.__data.rfind('\n', 0, pos) + 1
-        return '{}:{}:{}'.format(self.__fname, lineno, pos - lbegin)
+        self.__pos_factory.offset_to_pos(pos).raise_error(msg)
+
+    def _warn(self, msg, pos=None):
+        if pos is None:
+            pos = self.__pos
+        self.__pos_factory.offset_to_pos(pos).warn(msg)
 
     # Base parsers.  These are the only methods that directly
     # manipulate self.__data.
@@ -206,7 +206,7 @@ class Parser:
 
         # Skip to the next database entry or command
         self._tok('[^@]*')
-        pos = self._str_pos()
+        pos = self.__pos_factory.offset_to_pos(self.__pos)
         if not self._try_tok('@'):
             return None
 
@@ -321,7 +321,8 @@ class Entry(collections.OrderedDict):
     properties: typ gives the type of the entry, such as "journal",
     canonicalized to lower case; key gives the database entry key
     (case is preserved, but should be ignored for comparisons); and
-    pos gives the position of this entry in the database file.
+    pos is a messages.Pos instance giving the position of this entry
+    in the database file.
 
     Field values are as they would be seen by a .bst file: white space
     is cleaned up, but they retain macros, BibTeX-style accents, etc.
@@ -401,7 +402,7 @@ class Entry(collections.OrderedDict):
         """Return a sort key appropriate for sorting by date.
 
         Returns a tuple ([year, [month]]) where year and month are
-        numeric.  Raises ValueError if the entry has year and/or month
+        numeric.  Raises InputError if the entry has year and/or month
         fields, but they are malformed.
         """
 
@@ -409,11 +410,13 @@ class Entry(collections.OrderedDict):
         year, month = self.get('year'), self.get('month')
         if year is not None:
             if not year.isdigit():
-                raise ValueError('{}: invalid year `{}\''.format(self, year))
+                # XXX Use field position
+                self.pos.raise_error('invalid year `{}\''.format(year))
             key += (int(year),)
         if month is not None:
             if year is None:
-                raise ValueError('{}: month without year'.format(self))
+                # XXX Use field position
+                self.pos.raise_error('month without year')
             key += (self.month_num(),)
         return key
 
@@ -429,10 +432,11 @@ class Entry(collections.OrderedDict):
         month macro styles (and then some).
 
         Raises KeyError if this entry does not have the specified
-        field and ValueError if the field cannot be parsed.
+        field and InputError if the field cannot be parsed.
         """
         val = self[field].strip().rstrip('.').lower()
         for i, name in enumerate(MONTHS):
             if name.startswith(val) and len(val) >= 3:
                 return i + 1
-        raise ValueError('{}: invalid month `{}\''.format(self, self[field]))
+        # XXX Use field position
+        self.pos.raise_error('invalid month `{}\''.format(self[field]))
