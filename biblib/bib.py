@@ -267,6 +267,10 @@ class Parser:
             self._tok('=', 'expected = after field name')
             value = self._scan_field_value()
 
+            if field in field_pos:
+                pos.warn('repeated field `{}\''.format(field))
+                continue
+
             fields.append((field, value))
             field_pos[field] = self.__pos_factory.offset_to_pos(field_off)
 
