@@ -95,7 +95,7 @@ class Parser:
         else:
             self.__data = str_or_fp.read()
             fname = name or str_or_fp.name
-        self.__pos = 0
+        self.__off = 0
 
         # Remove trailing whitespace from lines in data (see input_ln
         # in bibtex.web)
@@ -104,7 +104,7 @@ class Parser:
 
         # Parse entries
         recoverer = messages.InputErrorRecoverer()
-        while self.__pos < len(self.__data):
+        while self.__off < len(self.__data):
             # Just continue to the next entry if there's an error
             with recoverer:
                 self._scan_command_or_entry()
@@ -134,15 +134,15 @@ class Parser:
 
         return self.__entries
 
-    def _fail(self, msg, pos=None):
-        if pos is None:
-            pos = self.__pos
-        self.__pos_factory.offset_to_pos(pos).raise_error(msg)
+    def _fail(self, msg, off=None):
+        if off is None:
+            off = self.__off
+        self.__pos_factory.offset_to_pos(off).raise_error(msg)
 
-    def _warn(self, msg, pos=None):
-        if pos is None:
-            pos = self.__pos
-        self.__pos_factory.offset_to_pos(pos).warn(msg)
+    def _warn(self, msg, off=None):
+        if off is None:
+            off = self.__off
+        self.__pos_factory.offset_to_pos(off).warn(msg)
 
     # Base parsers.  These are the only methods that directly
     # manipulate self.__data.
@@ -153,22 +153,22 @@ class Parser:
         Returns the matched text, or None if the match failed."""
         if isinstance(regexp, str):
             regexp = re.compile(regexp)
-        m = regexp.match(self.__data, self.__pos)
+        m = regexp.match(self.__data, self.__off)
         if m is None:
             return None
-        self.__pos = m.end()
+        self.__off = m.end()
         if skip_space:
             self._skip_space()
         return m.group(0)
 
     def _scan_balanced_text(self, term):
         """Scan brace-balanced text terminated with character term."""
-        start, level = self.__pos, 0
-        while self.__pos < len(self.__data):
-            char = self.__data[self.__pos]
+        start, level = self.__off, 0
+        while self.__off < len(self.__data):
+            char = self.__data[self.__off]
             if level == 0 and char == term:
-                text = self.__data[start:self.__pos]
-                self.__pos += 1
+                text = self.__data[start:self.__off]
+                self.__off += 1
                 self._skip_space()
                 return text
             elif char == '{':
@@ -177,14 +177,14 @@ class Parser:
                 level -= 1
                 if level < 0:
                     self._fail('unexpected }')
-            self.__pos += 1
+            self.__off += 1
         self._fail('unterminated string')
 
     def _skip_space(self):
         # This is equivalent to eat_bib_white_space, except that we do
         # it automatically after every token, whereas bibtex carefully
         # and explicitly does it between every token.
-        self.__pos = SPACE_RE.match(self.__data, self.__pos).end()
+        self.__off = SPACE_RE.match(self.__data, self.__off).end()
 
     # Helpers
 
@@ -206,7 +206,7 @@ class Parser:
 
         # Skip to the next database entry or command
         self._tok('[^@]*')
-        pos = self.__pos_factory.offset_to_pos(self.__pos)
+        pos = self.__pos_factory.offset_to_pos(self.__off)
         if not self._try_tok('@'):
             return None
 
@@ -262,7 +262,7 @@ class Parser:
                 break
 
             # Scan field name and value
-            field_off = self.__pos
+            field_off = self.__off
             field = self._scan_identifier().lower()
             self._tok('=', 'expected = after field name')
             value = self._scan_field_value()
@@ -296,7 +296,7 @@ class Parser:
             return self._scan_balanced_text('}')
         if self._try_tok('"', skip_space=False):
             return self._scan_balanced_text('"')
-        opos = self.__pos
+        opos = self.__off
         piece = self._try_tok(ID_RE)
         if piece is not None:
             if piece.lower() not in self.__macros:

@@ -273,14 +273,14 @@ class TeXProcessor:
         """
 
         self.__data = string
-        self.__pos = 0
+        self.__off = 0
 
         # Process macros
         while True:
-            m = tex_cs_re.search(self.__data, self.__pos)
+            m = tex_cs_re.search(self.__data, self.__off)
             if not m:
                 break
-            self.__pos = m.end()
+            self.__off = m.end()
             macro = m.group(1)
             nval = self._expand(macro)
             if nval is None:
@@ -289,32 +289,32 @@ class TeXProcessor:
                 raise ValueError(
                     'unknown special character `{}\''.format(macro))
             self.__data = self.__data[:m.start()] + nval + \
-                          self.__data[self.__pos:]
-            self.__pos = m.start() + len(nval)
+                          self.__data[self.__off:]
+            self.__off = m.start() + len(nval)
 
         return self.__data
 
     def _scan_argument(self):
         """Scan an return a macro argument."""
-        if self.__pos >= len(self.__data):
+        if self.__off >= len(self.__data):
             raise ValueError('argument expected')
-        if self.__data[self.__pos] == '{':
-            start = self.__pos
+        if self.__data[self.__off] == '{':
+            start = self.__off
             depth = 0
-            while depth or self.__pos == start:
-                if self.__data[self.__pos] == '{':
+            while depth or self.__off == start:
+                if self.__data[self.__off] == '{':
                     depth += 1
-                elif self.__data[self.__pos] == '}':
+                elif self.__data[self.__off] == '}':
                     depth -= 1
-                self.__pos += 1
-            return self.__data[start + 1:self.__pos - 1]
-        elif self.__data[self.__pos] == '\\':
-            m = tex_cs_re.match(self.__data, self.__pos)
-            self.__pos = m.end()
+                self.__off += 1
+            return self.__data[start + 1:self.__off - 1]
+        elif self.__data[self.__off] == '\\':
+            m = tex_cs_re.match(self.__data, self.__off)
+            self.__off = m.end()
             return m.group(1)
         else:
-            arg = self.__data[self.__pos]
-            self.__pos += 1
+            arg = self.__data[self.__off]
+            self.__off += 1
             return arg
 
     def _expand(self, cs):
