@@ -178,8 +178,11 @@ def parse_names(string, pos=messages.Pos.unknown):
 
 CS_RE = re.compile(r'\\[a-zA-Z]+')
 
-def title_case(string):
-    """Convert to title case (like BibTeX's built-in "change.case$")."""
+def title_case(string, pos=messages.Pos.unknown):
+    """Convert to title case (like BibTeX's built-in "change.case$").
+
+    Raises InputError if the title string contains syntax errors.
+    """
 
     # See "@<Perform the case conversion@>"
     out = []
@@ -223,7 +226,7 @@ def title_case(string):
             level += 1
         elif char == '}':
             if level == 0:
-                raise ValueError('unexpected }')
+                pos.raise_error('unexpected }')
             level -= 1
 
         # Handle colon state
