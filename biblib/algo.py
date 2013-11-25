@@ -268,15 +268,16 @@ class TeXProcessor:
     likewise, LaTeX).
     """
 
-    def process(self, string):
+    def process(self, string, pos):
         """Expand active characters and macros in string.
 
-        Raises ValueError if it encounters an active character or
+        Raises InputError if it encounters an active character or
         macro it doesn't recognize.
         """
 
         self.__data = string
         self.__off = 0
+        self.__pos = pos
 
         # Process macros
         while True:
@@ -288,8 +289,8 @@ class TeXProcessor:
             nval = self._expand(macro)
             if nval is None:
                 if macro.startswith('\\'):
-                    raise ValueError('unknown macro `{}\''.format(macro))
-                raise ValueError(
+                    pos.raise_error('unknown macro `{}\''.format(macro))
+                pos.raise_error(
                     'unknown special character `{}\''.format(macro))
             self.__data = self.__data[:m.start()] + nval + \
                           self.__data[self.__off:]
@@ -300,7 +301,7 @@ class TeXProcessor:
     def _scan_argument(self):
         """Scan an return a macro argument."""
         if self.__off >= len(self.__data):
-            raise ValueError('argument expected')
+            self.__pos.raise_error('macro argument expected')
         if self.__data[self.__off] == '{':
             start = self.__off
             depth = 0
@@ -361,8 +362,8 @@ class TeXToUnicode(TeXProcessor):
         '\\r': '\u030A', '\\k': '\u0328'
     }
 
-    def process(self, string):
-        string = super().process(string)
+    def process(self, string, pos):
+        string = super().process(string, pos)
 
         # Handle ligatures that are unique to TeX.  This must be done
         # after macro expansion, but before brace removal because
@@ -388,11 +389,11 @@ class TeXToUnicode(TeXProcessor):
             return unicodedata.normalize('NFC', seq) + rest
         return None
 
-def tex_to_unicode(string):
+def tex_to_unicode(string, pos=messages.Pos.unknown):
     """Convert a BibTeX field value written in TeX to Unicode.
 
     This interprets accents and other special tokens like '--' and
-    eliminates braces.  Raises ValueError if it encounters a macro it
+    eliminates braces.  Raises InputError if it encounters a macro it
     doesn't understand.
 
     Note that BibTeX's internal understanding of accented characters
@@ -401,4 +402,4 @@ def tex_to_unicode(string):
     goal is to display the string.
     """
 
-    return TeXToUnicode().process(string)
+    return TeXToUnicode().process(string, pos)
