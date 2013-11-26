@@ -105,8 +105,14 @@ class InputErrorRecoverer:
 
     def __del__(self):
         if self.__errors is not None:
-            warnings.warn('InputErrorRecoverer must be reraised or disposed',
-                          stacklevel=2)
+            try:
+                warnings.warn('InputErrorRecoverer must be reraised or disposed',
+                              stacklevel=2)
+            except TypeError as e:
+                # If Python is exiting, warnings.warn has a habit of
+                # raising TypeError("'NoneType' object is not
+                # iterable",).  Ignore it.
+                pass
 
     def reraise(self):
         """If any errors have been collected, raise a bundled InputError."""
