@@ -369,13 +369,13 @@ class Entry(collections.OrderedDict):
         """
 
         lines = ['@%s{%s,' % (self.typ, self.key)]
-        for k, v in self.fields.items():
+        for k, v in self.items():
             start = '  {:12} = '.format(k)
 
             if month_to_macro and k == 'month':
                 try:
-                    macro = MONTH_MACROS[1 + self.month_num()]
-                except ValueError:
+                    macro = MONTH_MACROS[self.month_num() - 1]
+                except messages.InputError:
                     pass
                 else:
                     lines.append(start + macro + ',')
