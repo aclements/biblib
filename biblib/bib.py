@@ -370,25 +370,29 @@ class Entry(collections.OrderedDict):
 
         lines = ['@%s{%s,' % (self.typ, self.key)]
         for k, v in self.fields.items():
+            start = '  {:12} = '.format(k)
+
             if month_to_macro and k == 'month':
                 try:
                     macro = MONTH_MACROS[1 + self.month_num()]
-                    lines.append('  {:12} = {},'.format(k, macro))
-                    continue
                 except ValueError:
                     pass
+                else:
+                    lines.append(start + macro + ',')
+                    continue
 
-            start = '  {:12} = {{'.format(k)
-            if wrap_width is not None:
+            if v.isdigit():
+                lines.append(start + v + ',')
+            elif wrap_width is None:
+                lines.append(start + '{' + v + '},')
+            else:
                 lines.append(textwrap.fill(
                     v, width=wrap_width,
                     # Keep whitespace formatting as it is
                     expand_tabs=False, replace_whitespace=False,
                     # Don't break long things like URLs
                     break_long_words=False, break_on_hyphens=False,
-                    initial_indent=start, subsequent_indent='    ') + '},')
-            else:
-                lines.append(start + v + '},')
+                    initial_indent=start + '{', subsequent_indent='    ') + '},')
         lines.append('}')
         return '\n'.join(lines)
 
