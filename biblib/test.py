@@ -2,6 +2,7 @@ import unittest
 import collections
 from .bib import *
 from .algo import *
+from .messages import *
 from . import algo
 
 def od(*args):
@@ -63,6 +64,63 @@ class BibParserTest(unittest.TestCase):
             # Braces intentionally unbalanced, everything on one line
             '@comment{abc@misc{x}',
             [ent('misc', 'x', od())])
+
+class EntryTest(unittest.TestCase):
+    def test_to_bib(self):
+        entry = Entry([('author', 'An Author'),
+                       ('title', 'This is a ' + 'really '*10 + 'long title'),
+                       ('month', 'November'), ('year', '2013')],
+                      typ='misc', key='key')
+        self.assertEqual(
+            entry.to_bib(),
+            '''\
+@misc{key,
+  author       = {An Author},
+  title        = {This is a really really really really really really
+    really really really really long title},
+  month        = nov,
+  year         = 2013,
+}''')
+        self.assertEqual(
+            entry.to_bib(month_to_macro=False, wrap_width=None),
+            '''\
+@misc{key,
+  author       = {An Author},
+  title        = {This is a really really really really really really really really really really long title},
+  month        = {November},
+  year         = 2013,
+}''')
+
+    def test_month_num(self):
+        def test(string, expect):
+            entry = Entry([('month', string)], field_pos={'month': Pos.unknown})
+            self.assertEqual(entry.month_num(), expect)
+        for i, name in enumerate(['Jan.','Feb.','Mar.','Apr.','May','June',
+                                  'July','Aug.','Sept.','Oct.','Nov.','Dec.']):
+            test(name, i+1)
+        for i, name in enumerate(['January','February','March','April',
+                                  'May','June','July','August',
+                                  'September','October','November','December']):
+            test(name, i+1)
+        self.assertRaises(InputError, test, 'Foo', None)
+        self.assertRaises(InputError, test, 'Janruary', None)
+
+    def test_date_key(self):
+        def test(year, month, expect):
+            fields = []
+            if year: fields.append(('year', year))
+            if month: fields.append(('month', month))
+            entry = Entry(fields, field_pos={'year' : Pos.unknown,
+                                             'month' : Pos.unknown})
+            got = entry.date_key()
+            if expect is not None:
+                self.assertEqual(got, expect)
+        test(None, None, ())
+        test('2013', None, (2013,))
+        test('2013', 'jan', (2013, 1))
+        self.assertRaises(InputError, test, 'x', None, None)
+        self.assertRaises(InputError, test, None, 'jan', None)
+        self.assertRaises(InputError, test, '2013', 'foo', None)
 
 class NameParserTest(unittest.TestCase):
     def test_first_char(self):
