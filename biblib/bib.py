@@ -352,7 +352,7 @@ class Entry(collections.OrderedDict):
         try:
             return super().__getitem__(field)
         except KeyError:
-            raise FieldError(field, self)
+            raise FieldError(field, self) from None
 
     def __eq__(self, o):
         """Two Entries are equal if they have the same fields, type, and key."""
