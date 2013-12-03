@@ -1,0 +1,49 @@
+#!/usr/bin/env python3
+
+import biblib.bib
+import biblib.messages
+import argparse
+import sys
+
+def main():
+    arg_parser = argparse.ArgumentParser(
+        description='Flatten macros, combine, and pretty-print .bib database(s)')
+    arg_parser.add_argument('bib', nargs='+', help='.bib file(s) to process',
+                            type=open)
+    arg_parser.add_argument('--resolve-crossrefs', action='store_true',
+                            help='copy fields from cross-referenced entries')
+    args = arg_parser.parse_args()
+
+    # Load databases
+    try:
+        db = load_bibs(args.bib)
+    except biblib.messages.InputError:
+        sys.exit(1)
+
+    # Optionally resolve cross-references
+    if args.resolve_crossrefs:
+        for k in db:
+            db[k] = db[k].resolve_crossref(db)
+
+    # Pretty-print entries
+    for ent in db.values():
+        print(ent.to_bib())
+        print()
+
+def load_bibs(files):
+    # Accumulate errors from all files before giving up
+    recoverer = biblib.messages.InputErrorRecoverer()
+    # Parse each file and get database
+    parser = biblib.bib.Parser()
+    for file in files:
+        with recoverer:
+            parser.parse(file, log_fp=sys.stderr)
+    with recoverer:
+        db = parser.finalize()
+    # If there were errors, raise them now
+    recoverer.reraise()
+
+    return db
+
+if __name__ == '__main__':
+    main()

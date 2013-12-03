@@ -46,6 +46,15 @@ Biblib can also be installed system-wide with
     python3 setup.py install
 
 
+Examples
+--------
+
+There are a few simple examples of biblib's use in `examples/`.  To
+run these dircetly from the source tree, use, for example
+
+    PYTHONPATH=$PWD ./examples/bibparse
+
+
 Recognized grammar
 ------------------
 

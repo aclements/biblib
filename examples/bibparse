@@ -1,0 +1,78 @@
+#!/usr/bin/env python3
+
+import biblib.bib
+import biblib.messages
+import biblib.algo
+import argparse
+import sys
+import re
+
+MONTHS = 'January February March April May June July August September October November December'.split()
+
+def main():
+    arg_parser = argparse.ArgumentParser(
+        description='Parse .bib database(s) and print basic fields as text')
+    arg_parser.add_argument('bib', nargs='+', help='.bib file(s) to process',
+                            type=open)
+    args = arg_parser.parse_args()
+
+    # Load databases
+    try:
+        db = load_bibs(args.bib)
+    except biblib.messages.InputError:
+        sys.exit(1)
+
+    # Resolve cross-references
+    for k in db:
+        db[k] = db[k].resolve_crossref(db)
+
+    # Print entries
+    for ent in db.values():
+        print('{ent.key} ({ent.typ}):'.format(ent=ent))
+        if 'title' in ent:
+            print('  ' + biblib.algo.tex_to_unicode(biblib.algo.title_case(
+                ent['title'], pos=ent.field_pos['title'])))
+        if 'author' in ent:
+            authors = [
+                biblib.algo.tex_to_unicode(
+                    re.sub(' +', ' ', '{0.first} {0.von} {0.last} {0.jr}'
+                           .format(author)).strip(),
+                    pos = ent.field_pos['author'])
+                for author in ent.authors()]
+            if len(authors) == 0:
+                author = None
+            elif len(authors) == 1:
+                author = authors[0]
+            elif len(authors) == 2:
+                author = '{} and {}'.format(*authors)
+            else:
+                author = '{}, and {}'.format(', '.join(authors[:-1]),
+                                             authors[-1])
+            if author:
+                print('  By ' + author)
+        if 'year' in ent:
+            if 'month' in ent:
+                mnum = ent.month_num()
+                print('  {} {}'.format(MONTHS[mnum - 1], ent['year']))
+            else:
+                print('  {}'.format(ent['year']))
+
+        print()
+
+def load_bibs(files):
+    # Accumulate errors from all files before giving up
+    recoverer = biblib.messages.InputErrorRecoverer()
+    # Parse each file and get database
+    parser = biblib.bib.Parser()
+    for file in files:
+        with recoverer:
+            parser.parse(file, log_fp=sys.stderr)
+    with recoverer:
+        db = parser.finalize()
+    # If there were errors, raise them now
+    recoverer.reraise()
+
+    return db
+
+if __name__ == '__main__':
+    main()
