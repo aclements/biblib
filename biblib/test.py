@@ -122,6 +122,34 @@ class EntryTest(unittest.TestCase):
         self.assertRaises(InputError, test, None, 'jan', None)
         self.assertRaises(InputError, test, '2013', 'foo', None)
 
+class CrossRefTest(unittest.TestCase):
+    def setUp(self):
+        self.parser = Parser().parse("""\
+        @misc{ent1, title={Title 1}, crossref={ent2}}
+        @misc{ent2, title={Title 2}, booktitle={Book title 2}}""")
+
+    def test_basic(self):
+        db = resolve_crossrefs(self.parser.get_entries())
+        self.assertEqual(
+            [('ent1', ent('misc', 'ent1', [('title', 'Title 1'),
+                                           ('booktitle', 'Book title 2')])),
+             ('ent2', ent('misc', 'ent2', [('title', 'Title 2'),
+                                           ('booktitle', 'Book title 2')]))],
+            list(db.items()))
+
+    def test_self_crossref(self):
+        # This is accepted, believe it or not (though BibTeX warns)
+        self.parser.parse("""\
+        @misc{ent3, title={Title 3}, crossref={ent3}}""")
+        resolve_crossrefs(self.parser.get_entries())
+
+    def test_bad_order(self):
+        self.parser.parse("""\
+        @misc{ent3, title={Title 3}, crossref={ent2}}""")
+        with self.assertRaises(InputError) as ar:
+            resolve_crossrefs(self.parser.get_entries())
+        self.assertEqual(1, len(ar.exception.args[0]))
+
 class NameParserTest(unittest.TestCase):
     def test_first_char(self):
         p = algo.NameParser()

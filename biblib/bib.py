@@ -458,17 +458,23 @@ def resolve_crossrefs(db):
     If there are unknown crossrefs, raises a (potentially bundled)
     InputError.
     """
+    key_idx = {k: i for i, k in enumerate(db)}
     recoverer = messages.InputErrorRecoverer()
     ndb = collections.OrderedDict()
-    for key, entry in db.items():
+    for entry_idx, (key, entry) in enumerate(db.items()):
         crossref = entry.get('crossref')
         if crossref is None:
             ndb[key] = entry
-        elif crossref.lower() in db:
-            ndb[key] = entry.resolve_crossref(db)
         else:
             with recoverer:
-                entry.field_pos['crossref'].raise_error(
-                    'unknown crossref `{}\''.format(crossref))
+                crossref_idx = key_idx.get(crossref.lower())
+                if crossref_idx is None:
+                    entry.field_pos['crossref'].raise_error(
+                        'unknown crossref `{}\''.format(crossref))
+                elif crossref_idx < entry_idx:
+                    entry.field_pos['crossref'].raise_error(
+                        'crossref `{}\' must come after entry'.format(crossref))
+                else:
+                    ndb[key] = entry.resolve_crossref(db)
     recoverer.reraise()
     return ndb
