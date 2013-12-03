@@ -10,8 +10,10 @@ def main():
         description='Flatten macros, combine, and pretty-print .bib database(s)')
     arg_parser.add_argument('bib', nargs='+', help='.bib file(s) to process',
                             type=open)
-    arg_parser.add_argument('--resolve-crossrefs', action='store_true',
-                            help='copy fields from cross-referenced entries')
+    arg_parser.add_argument('--min-crossrefs', type=int,
+                            help='minimum number of cross-referencing entries'
+                            ' required to expand a crossref; if omitted, no'
+                            ' expansion occurs', default=None)
     args = arg_parser.parse_args()
 
     try:
@@ -19,8 +21,9 @@ def main():
         db = biblib.bib.Parser().parse(args.bib, log_fp=sys.stderr).get_entries()
 
         # Optionally resolve cross-references
-        if args.resolve_crossrefs:
-            db = biblib.bib.resolve_crossrefs(db)
+        if args.min_crossrefs is not None:
+            db = biblib.bib.resolve_crossrefs(
+                db, min_crossrefs=args.min_crossrefs)
     except biblib.messages.InputError:
         sys.exit(1)
 
