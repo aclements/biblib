@@ -52,7 +52,7 @@ Examples
 There are a few simple examples of biblib's use in `examples/`.  To
 run these dircetly from the source tree, use, for example
 
-    PYTHONPATH=$PWD ./examples/bibparse
+    PYTHONPATH=$PWD ./examples/bibparse test.bib
 
 
 Recognized grammar
