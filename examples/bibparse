@@ -31,24 +31,27 @@ def main():
         if 'title' in ent:
             print('  ' + biblib.algo.tex_to_unicode(biblib.algo.title_case(
                 ent['title'], pos=ent.field_pos['title'])))
+
         if 'author' in ent:
             authors = [
-                biblib.algo.tex_to_unicode(
-                    re.sub(' +', ' ', '{0.first} {0.von} {0.last} {0.jr}'
-                           .format(author)).strip(),
-                    pos = ent.field_pos['author'])
+                biblib.algo.tex_to_unicode(author.pretty(),
+                                           pos=ent.field_pos['author'])
                 for author in ent.authors()]
             if len(authors) == 0:
                 author = None
             elif len(authors) == 1:
                 author = authors[0]
-            elif len(authors) == 2:
-                author = '{} and {}'.format(*authors)
             else:
-                author = '{}, and {}'.format(', '.join(authors[:-1]),
-                                             authors[-1])
+                author = ', '.join(authors[:-1])
+                if len(authors) > 2:
+                    author += ','
+                if ent.authors()[-1].is_others():
+                    author += ' et al.'
+                else:
+                    author += ' and ' + authors[-1]
             if author:
                 print('  By ' + author)
+
         if 'year' in ent:
             if 'month' in ent:
                 mnum = ent.month_num()
