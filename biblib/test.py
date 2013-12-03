@@ -138,6 +138,23 @@ class CrossRefTest(unittest.TestCase):
                                            ('booktitle', 'Book title 2')]))],
             list(db.items()))
 
+    def test_min_crossrefs(self):
+        db = resolve_crossrefs(self.parser.get_entries(), min_crossrefs=1)
+        self.assertEqual(
+            [('ent1', ent('misc', 'ent1', [('title', 'Title 1'),
+                                           ('crossref', 'ent2')])),
+             ('ent2', ent('misc', 'ent2', [('title', 'Title 2'),
+                                           ('booktitle', 'Book title 2')]))],
+            list(db.items()))
+
+        db = resolve_crossrefs(self.parser.get_entries(), min_crossrefs=2)
+        self.assertEqual(
+            [('ent1', ent('misc', 'ent1', [('title', 'Title 1'),
+                                           ('booktitle', 'Book title 2')])),
+             ('ent2', ent('misc', 'ent2', [('title', 'Title 2'),
+                                           ('booktitle', 'Book title 2')]))],
+            list(db.items()))
+
     def test_self_crossref(self):
         # This is accepted, believe it or not (though BibTeX warns)
         log = io.StringIO()

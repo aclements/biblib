@@ -450,16 +450,29 @@ class Entry(collections.OrderedDict):
         from .algo import parse_month
         return parse_month(self[field], pos=self.field_pos[field])
 
-def resolve_crossrefs(db):
+def resolve_crossrefs(db, min_crossrefs=None):
     """Resolve cross-referenced entries in db.
 
     This returns a new database containing the same entries in the
     same order as db, but any entries that crossref another entry are
     expanded with the fields for the cross-referenced entry.
 
+    If min_crossrefs is not None, then any entry that is
+    cross-referenced by min_crossrefs or more other entries will *not*
+    be expanded and entries that cross-reference it will retain their
+    crossref field.  If min_crossrefs is None, entries are always
+    expanded.  (This mimics BibTeX "-min-crossrefs" option.)
+
     If there are unknown crossrefs, raises a (potentially bundled)
     InputError.
     """
+    if min_crossrefs is not None:
+        counts = collections.Counter(entry['crossref'].lower()
+                                     for entry in db.values()
+                                     if 'crossref' in entry)
+    else:
+        counts = None
+
     key_idx = {k: i for i, k in enumerate(db)}
     recoverer = messages.InputErrorRecoverer()
     ndb = collections.OrderedDict()
@@ -476,6 +489,8 @@ def resolve_crossrefs(db):
                 elif crossref_idx < entry_idx:
                     entry.field_pos['crossref'].raise_error(
                         'crossref `{}\' must come after entry'.format(crossref))
+                elif counts and counts[crossref.lower()] >= min_crossrefs:
+                    ndb[key] = entry
                 else:
                     ndb[key] = entry.resolve_crossref(db)
     recoverer.reraise()
