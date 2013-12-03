@@ -13,6 +13,7 @@ __all__ = ('Name parse_names ' +
 import re
 import collections
 import unicodedata
+import string
 
 from . import messages
 
@@ -167,6 +168,68 @@ class Name(collections.namedtuple('Name', 'first von last jr')):
     def is_others(self):
         return self.first == '' and self.von == '' and \
             self.last == 'others' and self.jr == ''
+
+    def pretty(self, template='{first} {von} {last} {jr}'):
+        """Pretty-print author according to template.
+
+        The template is a 'format' template with the added feature
+        that literal text surrounding fields that expand to empty
+        strings is prioritized, rather than concatenated.
+        Specifically, of the literal text snippets between two
+        non-null fields, only the first of the highest priority is
+        kept, where non-white space outranks white space outranks the
+        empty string.  Literal text before and after the first and
+        last fields is always kept.
+
+        Hence, if the template is '{von} {last}, {first}, {jr}' and
+        the name has a last and a jr not no von or first, then the
+        first comma will be kept and the space and second dropped.  If
+        the name has only a von and a last, then both commas will be
+        dropped.  If the name has only a last, then all separators
+        will be dropped.
+        """
+
+        # XXX BibTeX's own format.name$ templates are more
+        # sophisticated than this, and it's not clear these are easier
+        # to use.  These do have the (dubious) benefit of having
+        # access to the usual format machinery.
+
+        def priority(string):
+            if not string:
+                return 0
+            elif string.isspace():
+                return 1
+            return 2
+        fields = {'first': self.first, 'von': self.von,
+                  'last': self.last, 'jr': self.jr}
+        f = string.Formatter()
+        pieces = ['']
+        first_field, last_field = 0, -1
+        leading = trailing = ''
+        for i, (literal_text, field_name, format_spec, conv) in \
+            enumerate(f.parse(template)):
+            if i == 0:
+                # Always keep leading text
+                leading = literal_text
+            elif field_name is None:
+                # Always keep trailing test
+                trailing = literal_text
+            elif priority(literal_text) > priority(pieces[-1]):
+                # Overrides previous piece
+                pieces[-1] = literal_text
+
+            if field_name is not None:
+                obj, _ = f.get_field(field_name, (), fields)
+                if not obj:
+                    continue
+                obj = f.convert_field(obj, conv)
+                if first_field == 0:
+                    first_field = len(pieces)
+                last_field = len(pieces)
+                pieces.extend([f.format_field(obj, format_spec), ''])
+        # Only keep the pieces between non-null fields
+        pieces = pieces[first_field:last_field + 1]
+        return leading + ''.join(pieces) + trailing
 
 def parse_names(string, pos=messages.Pos.unknown):
     """Parse a BibTeX name list (e.g., an author or editor field).

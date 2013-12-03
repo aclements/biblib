@@ -238,6 +238,47 @@ class NameParserTest(unittest.TestCase):
             ('De la Fontaine, Jean, Jr', 'Jean', 'De la', 'Fontaine', 'Jr'),
             ('de La Fontaine, Jean, Jr', 'Jean', 'de', 'La Fontaine', 'Jr'))
 
+class NamePrettyTest(unittest.TestCase):
+    def __test(self, template, gen):
+        for i in range(0x10):
+            name = Name('f' if i & 1 else '',
+                        'v' if i & 2 else '',
+                        'l' if i & 4 else '',
+                        'j' if i & 8 else '')
+            got = name.pretty(template)
+            self.assertEqual(gen(name), got)
+
+    def __clean(self, string):
+        import re
+        string = re.sub(' +', ' ', string)
+        string = re.sub(' *(, )+', ', ', string)
+        return string.strip(' ,')
+
+    def test_basic(self):
+        self.__test(
+            '{first}{von}{jr}{last}',
+            lambda n: n.first+n.von+n.jr+n.last)
+        self.__test(
+            '{first} {von} {last} {jr}',
+            lambda n: self.__clean(' '.join([n.first, n.von, n.last, n.jr])))
+        self.__test(
+            '{von} {last}, {first}',
+            lambda n: self.__clean('{0.von} {0.last}, {0.first}'.format(n)))
+        self.__test(
+            '{von} {last}, {first}, {jr}',
+            lambda n: self.__clean('{0.von} {0.last}, {0.first}, {0.jr}'.format(n)))
+
+    def test_before_and_after(self):
+        self.__test(
+            'a{first}{von}{jr}{last}b',
+            lambda n: 'a'+n.first+n.von+n.jr+n.last+'b')
+        self.__test(
+            'a{first} {von} {last} {jr}b',
+            lambda n: 'a'+self.__clean(' '.join([n.first, n.von, n.last, n.jr]))+'b')
+
+    def test_others(self):
+        self.assertEqual(Name('', '', 'others', '').pretty(), 'et al.')
+
 class CaseTest(unittest.TestCase):
     def __test(self, *tests):
         for string, want in tests:
