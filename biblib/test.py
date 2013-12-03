@@ -1,5 +1,6 @@
 import unittest
 import collections
+import io
 from .bib import *
 from .algo import *
 from .messages import *
@@ -139,9 +140,11 @@ class CrossRefTest(unittest.TestCase):
 
     def test_self_crossref(self):
         # This is accepted, believe it or not (though BibTeX warns)
-        self.parser.parse("""\
-        @misc{ent3, title={Title 3}, crossref={ent3}}""")
+        log = io.StringIO()
+        self.parser.parse("@misc{ent3, title={Title 3}, crossref={ent3}}",
+                          name='<ent3>', log_fp=log)
         resolve_crossrefs(self.parser.get_entries())
+        self.assertIn('<ent3>:1:', log.getvalue())
 
     def test_bad_order(self):
         self.parser.parse("""\

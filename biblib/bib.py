@@ -401,6 +401,8 @@ class Entry(collections.OrderedDict):
             return self
         nentry = self.copy()
         source = entries[self['crossref'].lower()]
+        if 'crossref' in source:
+            self.field_pos['crossref'].warn('nested crossref')
         for k, v in source.items():
             if k not in nentry:
                 nentry[k] = v
