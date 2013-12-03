@@ -6,7 +6,7 @@ especially section "Reading the database file(s)" -- and hence
 own parser.
 """
 
-__all__ = 'Parser Entry FieldError'.split()
+__all__ = 'Parser Entry FieldError resolve_crossrefs'.split()
 
 import sys
 import re
@@ -123,27 +123,12 @@ class Parser:
         recoverer.reraise()
         return self
 
-    def finalize(self):
-        """Perform final checks and return the database.
+    def get_entries(self):
+        """Return the entry database.
 
-        This checks cross-ref validity and returns the database.  The
-        database is an ordered dictionary mapping from lower-cased
+        The database is an ordered dictionary mapping from lower-cased
         keys to Entry objects.
-
-        If there are errors during finalization, raises a (potentially
-        bundled) InputError.
         """
-
-        # Check cross-refs (XXX crossrefs must come later)
-        recoverer = messages.InputErrorRecoverer()
-        for ent in self.__entries.values():
-            crossref = ent.get('crossref')
-            if crossref is not None and crossref.lower() not in self.__entries:
-                with recoverer:
-                    ent.pos.raise_error(
-                        'unknown crossref `{}\''.format(crossref))
-        recoverer.reraise()
-
         return self.__entries
 
     def _fail(self, msg, off=None):
@@ -462,3 +447,28 @@ class Entry(collections.OrderedDict):
         """
         from .algo import parse_month
         return parse_month(self[field], pos=self.field_pos[field])
+
+def resolve_crossrefs(db):
+    """Resolve cross-referenced entries in db.
+
+    This returns a new database containing the same entries in the
+    same order as db, but any entries that crossref another entry are
+    expanded with the fields for the cross-referenced entry.
+
+    If there are unknown crossrefs, raises a (potentially bundled)
+    InputError.
+    """
+    recoverer = messages.InputErrorRecoverer()
+    ndb = collections.OrderedDict()
+    for key, entry in db.items():
+        crossref = entry.get('crossref')
+        if crossref is None:
+            ndb[key] = entry
+        elif crossref.lower() in db:
+            ndb[key] = entry.resolve_crossref(db)
+        else:
+            with recoverer:
+                entry.field_pos['crossref'].raise_error(
+                    'unknown crossref `{}\''.format(crossref))
+    recoverer.reraise()
+    return ndb

@@ -14,16 +14,15 @@ def main():
                             help='copy fields from cross-referenced entries')
     args = arg_parser.parse_args()
 
-    # Load databases
     try:
-        db = biblib.bib.Parser().parse(args.bib, log_fp=sys.stderr).finalize()
+        # Load databases
+        db = biblib.bib.Parser().parse(args.bib, log_fp=sys.stderr).get_entries()
+
+        # Optionally resolve cross-references
+        if args.resolve_crossrefs:
+            db = biblib.bib.resolve_crossrefs(db)
     except biblib.messages.InputError:
         sys.exit(1)
-
-    # Optionally resolve cross-references
-    if args.resolve_crossrefs:
-        for k in db:
-            db[k] = db[k].resolve_crossref(db)
 
     # Pretty-print entries
     for ent in db.values():

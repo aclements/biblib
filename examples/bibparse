@@ -16,15 +16,14 @@ def main():
                             type=open)
     args = arg_parser.parse_args()
 
-    # Load databases
     try:
-        db = biblib.bib.Parser().parse(args.bib, log_fp=sys.stderr).finalize()
+        # Load databases
+        db = biblib.bib.Parser().parse(args.bib, log_fp=sys.stderr).get_entries()
+
+        # Resolve cross-references
+        db = biblib.bib.resolve_crossrefs(db)
     except biblib.messages.InputError:
         sys.exit(1)
-
-    # Resolve cross-references
-    for k in db:
-        db[k] = db[k].resolve_crossref(db)
 
     # Print entries
     for ent in db.values():

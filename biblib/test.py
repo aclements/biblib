@@ -14,7 +14,7 @@ def ent(typ, key, fields):
 class BibParserTest(unittest.TestCase):
     def __test_parse(self, string, ents):
         # Parse string and get entries
-        got = list(Parser().parse(string).finalize().values())
+        got = list(Parser().parse(string).get_entries().values())
         self.assertEqual(got, ents)
 
     def test_basic(self):
