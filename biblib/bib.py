@@ -11,6 +11,7 @@ __all__ = 'Parser Entry FieldError'.split()
 import sys
 import re
 import collections
+import collections.abc
 import textwrap
 
 from . import messages
@@ -67,12 +68,13 @@ class Parser:
         """Declare a macro, just like an @string command."""
         self.__macros[name] = value
 
-    def parse(self, str_or_fp, name=None, *, log_fp=None):
-        """Parse the contents of str_or_fp and return self.
+    def parse(self, str_or_fp_or_iter, name=None, *, log_fp=None):
+        """Parse the contents of str_or_fp_or_iter and return self.
 
-        str_or_fp must be a string or a file-like object.  If name is
-        not None, it is used as the file name.  Otherwise, the name is
-        '<string>' for str objects or str_or_fp.name otherwise.
+        str_or_fp_or_iter must be a string, a file-like object, or an
+        iterable of string or file-like objects to parse in
+        succession.  If name is not None, it is used as the file name.
+        Otherwise, a name is constructed in a type-appropriate way.
 
         If log_fp is not None, it must be a file-local object to which
         warnings and InputErrors will be logged.  This logger will be
@@ -89,12 +91,23 @@ class Parser:
         defined in earlier files.
         """
 
-        if isinstance(str_or_fp, str):
-            self.__data = str_or_fp
+        recoverer = messages.InputErrorRecoverer()
+        if isinstance(str_or_fp_or_iter, str):
+            self.__data = str_or_fp_or_iter
             fname = name or '<string>'
+        elif isinstance(str_or_fp_or_iter, collections.abc.Iterable) and \
+             not hasattr(str_or_fp_or_iter, 'read'):
+            for obj in str_or_fp_or_iter:
+                with recoverer:
+                    self.parse(obj, name=name, log_fp=log_fp)
+            recoverer.reraise()
+            return self
         else:
-            self.__data = str_or_fp.read()
-            fname = name or str_or_fp.name
+            self.__data = str_or_fp_or_iter.read()
+            try:
+                fname = name or str_or_fp_or_iter.name
+            except AttributeError:
+                fname = '<unknown>'
         self.__off = 0
 
         # Remove trailing whitespace from lines in data (see input_ln
@@ -103,7 +116,6 @@ class Parser:
         self.__pos_factory = messages.PosFactory(fname, self.__data, log_fp)
 
         # Parse entries
-        recoverer = messages.InputErrorRecoverer()
         while self.__off < len(self.__data):
             # Just continue to the next entry if there's an error
             with recoverer:
