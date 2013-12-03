@@ -18,7 +18,7 @@ def main():
 
     # Load databases
     try:
-        db = load_bibs(args.bib)
+        db = biblib.bib.Parser().parse(args.bib, log_fp=sys.stderr).finalize()
     except biblib.messages.InputError:
         sys.exit(1)
 
@@ -58,21 +58,6 @@ def main():
                 print('  {}'.format(ent['year']))
 
         print()
-
-def load_bibs(files):
-    # Accumulate errors from all files before giving up
-    recoverer = biblib.messages.InputErrorRecoverer()
-    # Parse each file and get database
-    parser = biblib.bib.Parser()
-    for file in files:
-        with recoverer:
-            parser.parse(file, log_fp=sys.stderr)
-    with recoverer:
-        db = parser.finalize()
-    # If there were errors, raise them now
-    recoverer.reraise()
-
-    return db
 
 if __name__ == '__main__':
     main()
