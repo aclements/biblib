@@ -6,6 +6,7 @@ to Python.
 """
 
 __all__ = ('Name parse_names ' +
+           'parse_month ' +
            'title_case ' +
            'TeXProcessor TeXToUnicode tex_to_unicode').split()
 
@@ -175,6 +176,22 @@ def parse_names(string, pos=messages.Pos.unknown):
     there is a syntax error.
     """
     return NameParser().parse(string, pos)
+
+_MONTHS = 'January February March April May June July August September October November December'.lower().split()
+
+def parse_month(string, pos=messages.Pos.unknown):
+    """Parse a BibTeX month field.
+
+    This performs fairly fuzzy parsing that supports all standard
+    month macro styles (and then some).
+
+    Raises InputError if the field cannot be parsed.
+    """
+    val = string.strip().rstrip('.').lower()
+    for i, name in enumerate(_MONTHS):
+        if name.startswith(val) and len(val) >= 3:
+            return i + 1
+    pos.raise_error('invalid month `{}\''.format(string))
 
 CS_RE = re.compile(r'\\[a-zA-Z]+')
 

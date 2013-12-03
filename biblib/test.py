@@ -70,7 +70,7 @@ class EntryTest(unittest.TestCase):
         entry = Entry([('author', 'An Author'),
                        ('title', 'This is a ' + 'really '*10 + 'long title'),
                        ('month', 'November'), ('year', '2013')],
-                      typ='misc', key='key')
+                      typ='misc', key='key', field_pos={'month': Pos.unknown})
         self.assertEqual(
             entry.to_bib(),
             '''\

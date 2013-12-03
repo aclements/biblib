@@ -319,8 +319,6 @@ class FieldError(KeyError):
 
 MONTH_MACROS = 'jan feb mar apr may jun jul aug sep oct nov dec'.split()
 
-MONTHS = 'January February March April May June July August September October November December'.lower().split()
-
 class Entry(collections.OrderedDict):
     """An entry in a BibTeX database.
 
@@ -435,22 +433,20 @@ class Entry(collections.OrderedDict):
         return key
 
     def authors(self, field='author'):
-        """Return a list of parsed author names."""
+        """Return a list of parsed author names.
+
+        This is a wrapper for biblib.algo.parse_names.
+        """
         from .algo import parse_names
         return parse_names(self[field], self.field_pos[field])
 
     def month_num(self, field='month'):
         """Convert the month of this entry into a number in [1,12].
 
-        This performs fairly fuzzy parsing that supports all standard
-        month macro styles (and then some).
+        This is a wrapper for biblib.algo.parse_month (which see).
 
         Raises KeyError if this entry does not have the specified
         field and InputError if the field cannot be parsed.
         """
-        val = self[field].strip().rstrip('.').lower()
-        for i, name in enumerate(MONTHS):
-            if name.startswith(val) and len(val) >= 3:
-                return i + 1
-        self.field_pos[field].raise_error(
-            'invalid month `{}\''.format(self[field]))
+        from .algo import parse_month
+        return parse_month(self[field], pos=self.field_pos[field])
