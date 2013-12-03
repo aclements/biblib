@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 
 import biblib.bib
-import biblib.messages
 import argparse
 import sys
 
