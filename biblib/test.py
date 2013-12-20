@@ -276,9 +276,6 @@ class NamePrettyTest(unittest.TestCase):
             'a{first} {von} {last} {jr}b',
             lambda n: 'a'+self.__clean(' '.join([n.first, n.von, n.last, n.jr]))+'b')
 
-    def test_others(self):
-        self.assertEqual(Name('', '', 'others', '').pretty(), 'et al.')
-
 class CaseTest(unittest.TestCase):
     def __test(self, *tests):
         for string, want in tests:
