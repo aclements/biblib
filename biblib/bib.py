@@ -28,7 +28,7 @@ class ParseError(Exception):
 class Parser:
     """A parser for .bib BibTeX database files."""
 
-    def __init__(self, *, month_style='full'):
+    def __init__(self, *, month_style='full', paranoid=False):
         """Initialize an empty database.
 
         This also initializes standard month macros (which are usually
@@ -43,6 +43,7 @@ class Parser:
 
         self.__log, self.__errors = [], False
         self.__entries = collections.OrderedDict()
+        self.__paranoid = paranoid
 
         if month_style == 'full':
             self.__macros = {'jan': 'January',   'feb': 'February',
@@ -119,7 +120,11 @@ class Parser:
             # Just continue to the next entry if there's an error
             with recoverer:
                 self._scan_command_or_entry()
-        recoverer.reraise()
+
+        if self.__paranoid:
+            recoverer.reraise()
+        else:
+            recoverer.dispose()
         return self
 
     def get_entries(self):
