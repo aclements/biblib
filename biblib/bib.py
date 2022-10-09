@@ -91,9 +91,11 @@ class Parser:
         """
 
         try:
+            # Python >= 3.10
             from collections.abc import Iterable as collections_Iterable
         except AttributeError:
-            from collections import Iterable as collections_Iterable  # does not work in python3.10 anymore
+            # Python < 3.10
+            from collections import Iterable as collections_Iterable
 
         recoverer = messages.InputErrorRecoverer()
         if isinstance(str_or_fp_or_iter, str):
