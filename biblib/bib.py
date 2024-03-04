@@ -11,6 +11,7 @@ __all__ = 'Parser Entry FieldError resolve_crossrefs'.split()
 import sys
 import re
 import collections
+import collections.abc
 import textwrap
 
 from . import messages
@@ -43,7 +44,7 @@ class Parser:
 
         self.__log, self.__errors = [], False
         self.__entries = collections.OrderedDict()
-
+        print("MONTH STYLE", month_style)
         if month_style == 'full':
             self.__macros = {'jan': 'January',   'feb': 'February',
                              'mar': 'March',     'apr': 'April',
@@ -51,6 +52,28 @@ class Parser:
                              'jul': 'July',      'aug': 'August',
                              'sep': 'September', 'oct': 'October',
                              'nov': 'November',  'dec': 'December'}
+        elif month_style == 'mine':
+            self.__macros = {'jan': 'January',   'feb': 'February',
+                             'mar': 'March',     'apr': 'April',
+                             'may': 'May',       'jun': 'June',
+                             'jul': 'July',      'aug': 'August',
+                             'sep': 'September', 'oct': 'October',
+                             'nov': 'November',  'dec': 'December',
+                             '01':'January', '1':'Janauary',
+                             '02':'February', '2':'February',
+                             '03':'March', '3':'March',
+                             '04':'April', '4':'April',
+                             '05':'May', '5':'May',
+                             '06':'June', '6':'June',
+                             '07':'July', '7':'July',
+                             '08':'August', '8':'August',
+                             '09':'September', '9':'September',
+                             '10':'October', '10':'October',
+                             '11':'November', '11':'November',
+                             '12':'December', '12':'December',
+                             'Jul-Aug': 'July', 'May-Jun': 'May',
+                             'Winter': 'December', 'fall': 'September',
+                             '2013/03/09': "March"}
         elif month_style == 'abbrv':
             self.__macros = {'jan': 'Jan.',  'feb': 'Feb.',
                              'mar': 'Mar.',  'apr': 'Apr.',
@@ -94,7 +117,7 @@ class Parser:
         if isinstance(str_or_fp_or_iter, str):
             self.__data = str_or_fp_or_iter
             fname = name or '<string>'
-        elif isinstance(str_or_fp_or_iter, collections.Iterable) and \
+        elif isinstance(str_or_fp_or_iter, collections.abc.Iterable) and \
              not hasattr(str_or_fp_or_iter, 'read'):
             for obj in str_or_fp_or_iter:
                 with recoverer:
