@@ -66,6 +66,23 @@ class BibParserTest(unittest.TestCase):
             '@comment{abc@misc{x}',
             [ent('misc', 'x', od())])
 
+    def test_comment_entry_types(self):
+        # @comment@book is entry type "book", not a comment command.
+        # Per BibTeX spec, @comment must be followed by a delimiter
+        # (space, tab, {, or ,) to be recognized as a comment;
+        # otherwise the text after @ is treated as the entry type.
+        self.__test_parse(
+            '@comment@book{test, title = {Test}}',
+            [ent('book', 'test', od('title', 'Test'))])
+        # @comment@string is entry type "string"
+        self.__test_parse(
+            '@comment@string{foo, title = {Bar}}',
+            [ent('string', 'foo', od('title', 'Bar'))])
+        # @comment followed by space is a valid comment
+        bib_with_comment = '@comment {text}\n@misc{x, title = {X}}'
+        self.__test_parse(bib_with_comment,
+            [ent('misc', 'x', od('title', 'X'))])
+
 class EntryTest(unittest.TestCase):
     def test_to_bib(self):
         entry = Entry([('author', 'An Author'),
