@@ -206,13 +206,35 @@ class Parser:
         if not self._try_tok('@'):
             return None
 
-        # Scan command or entry type
+        # Scan command or entry type.
+        # ID_RE includes '@', so "@comment@string" is scanned as one token
+        # (typ == 'comment@string').  We detect the "@comment@..."
+        # pattern by checking if the identifier ends with '@' — this means
+        # the second '@' was consumed as part of the identifier, indicating
+        # @comment was NOT followed by a valid delimiter.  In this case,
+        # @comment@string is valid entry type "string" per the BibTeX spec.
+        ident_start = self.__off
         typ = self._scan_identifier().lower()
 
+        # Handle "@comment@..." pattern.  ID_RE matches '@', so
+        # "@comment@string" is consumed as one identifier token.
+        # We detect this by checking if 'comment@' appears at the start.
+        if typ.startswith('comment@') and typ != 'comment':
+            # "@comment@string" was scanned as identifier "comment@string".
+            # Per BibTeX spec, @comment@string is entry type "string".
+            # Rewind to the second '@'; the recursive call will consume
+            # it and scan the real entry type.  Return its result so the
+            # outer call does not fall through to entry parsing.
+            self.__off = ident_start + typ.index('@', 1)
+            self.__in_comment_rewind = True
+            try:
+                result = self._scan_command_or_entry()
+            finally:
+                self.__in_comment_rewind = False
+            return result
+
         if typ == 'comment':
-            # Believe it or not, BibTeX doesn't do anything with what
-            # comes after an @comment, treating it like any other
-            # inter-entry noise.
+            # Valid @comment command (followed by whitespace, {, or ,).
             return None
 
         left = self._tok('[{(]', 'expected { or ( after entry type')
@@ -224,7 +246,7 @@ class Parser:
             self._tok(right_re, 'expected '+right)
             return None
 
-        if typ == 'string':
+        if typ == 'string' and not getattr(self, '_Parser__in_comment_rewind', False):
             name = self._scan_identifier().lower()
             if name in self.__macros:
                 self._warn('macro `{}\' redefined'.format(name))
